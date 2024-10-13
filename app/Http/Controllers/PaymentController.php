@@ -18,17 +18,16 @@ class PaymentController extends Controller
 
     public function initialPayment(Request $request)
     {
-        $validate = $request->validate([
+        $validated = $request->validate([
             'name' => 'required|min:3',
             'email' => 'required|email',
             'number' => 'required',
             'amount' => 'required'
         ]);
 
-        $cashfree = new Cashfree();
-        $cashfree->setClientId(env('CASHFREE_API_ID'));
-        $cashfree->setClientSecret(env('CASHFREE_API_SECRET'));
-        $cashfree->setEnvironment(Cashfree::SANDBOX);
+        // $cashfree->setClientId(env('CASHFREE_API_KEY'));
+        // $cashfree->setClientSecret(env('CASHFREE_API_SECRET'));
+        // $cashfree->setEnvironment(Cashfree::SANDBOX);
 
 
         // Cashfree::$XClientId = env('CASHFREE_API_ID');
@@ -37,47 +36,61 @@ class PaymentController extends Controller
         // Cashfree::$XEnvironment = Cashfree::$PRODUCTION;
 
 
-        $order_id = "inv_" . date('YmdHis');
-        $order_amount = $validate['amount'];
-        $customerID = "customer_" . rand(11111, 99999);
-        $return_url = "http://127.0.0.1:8000/success" . $order_id;
 
-        $x_api_version = "2023-08-01";
-        $order_note = 'Order note for reference';
-        $customer_phone = $validate['number'];
-        $customer_email = $validate['email'];
-        $customer_name = $validate['name'];
+        $url = "https://sandbox.cashfree.com/pg/orders";
+
+        $headers = array(
+            "Content-Type: application/json",
+            "x-api-version: 2022-01-01",
+            "x-client-id: " . env('CASHFREE_API_KEY'),
+            "x-client-secret: " . env('CASHFREE_API_SECRET')
+        );
+
+        $data = json_encode([
+            'order_id' =>  'order_' . rand(1111111111, 9999999999),
+            'order_amount' => $validated['amount'],
+            "order_currency" => "INR",
+            "customer_details" => [
+                "customer_id" => 'customer_' . rand(111111111, 999999999),
+                "customer_name" => $validated['name'],
+                "customer_email" => $validated['email'],
+                "customer_phone" => $validated['number'],
+            ],
+            "order_meta" => [
+                "return_url" => 'http://127.0.0.1:8000/cashfree/payments/success/?order_id={order_id}&order_token={order_token}'
+            ]
+        ]);
+
+        $curl = curl_init($url);
+
+        curl_setopt($curl, CURLOPT_URL, $url);
+        curl_setopt($curl, CURLOPT_POST, true);
+        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($curl, CURLOPT_POSTFIELDS, $data);
+
+        $resp = curl_exec($curl);
+
+        curl_close($curl);
+        // echo "<pre>";
+
+        // dd(json_decode($resp));
+        // echo "</pre>";
+        return redirect()->to(json_decode($resp)->payment_link);
 
 
-
-        $create_orders_request = new CreateOrderRequest();
-        $create_orders_request->setOrderId($order_id);
-        $create_orders_request->setOrderAmount($order_amount);
-        $create_orders_request->setOrderCurrency('INR');
-
-        $customer_details = new CustomerDetails();
-        $customer_details->setCustomerId($customerID);
-        $customer_details->setCustomerPhone($customer_phone);
-        $customer_details->setCustomerEmail($customer_email);
-        $customer_details->setCustomerName($customer_name);
-        $create_orders_request->setCustomerDetails($customer_details);
-
-
-        $order_meta = new OrderMeta();
-        $order_meta->setReturnUrl($return_url);
-        $create_orders_request->setOrderMeta($order_meta);
 
         try {
-            $result = $cashfree->PGCreateOrder($x_api_version, $create_orders_request);
+            dd($result);
             $payment_session_id = $result[0]['payment_session_id'];
-            // dd($result);
             return view('payment-page', compact("result", "payment_session_id"));
         } catch (Exception $e) {
             echo "Exception: " . $e->getMessage();
         }
-      }
+    }
 
-      public function PaymentSuccess($orderId){
+    public function PaymentSuccess($orderId)
+    {
         $url = "https://sandbox.cashfree.com/pg/orders/$orderId";
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
@@ -90,23 +103,23 @@ class PaymentController extends Controller
             'Accept: application/json',
             'x-api-version: 2023-08-01',
             'Content-type: application/json',
-            "x-client-id: ".env('CASHFREE_API_ID'),
-            "x-client-secret: ". env("CASHFREE_API_SECRET")
+            "x-client-id: " . env('CASHFREE_API_ID'),
+            "x-client-secret: " . env("CASHFREE_API_SECRET")
         ]);
 
         $results = curl_exec($ch);
-        if(curl_errno($ch)){
+        if (curl_errno($ch)) {
             $error_msg = curl_error($ch);
             curl_close($ch);
             return back()->withErrors("cURL Error: " . $error_msg);
         }
 
-        $returnCode =curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $returnCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
         $response = json_decode($results, true);
 
         // dd($response);
         return view('payment-success', compact('response'));
-      }
+    }
 }

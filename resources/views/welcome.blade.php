@@ -38,7 +38,8 @@
             </div>
         @endif
 
-        <form action="{{ route('payment.pay') }}" method="POST" name="pay_now">
+        {{-- <form action="{{ route('payment.pay') }}" method="POST" name="pay_now"> --}}
+        <form action="#" method="POST" name="pay_now">
             @csrf
             <div class="row">
                 <div class="col-lg-6">

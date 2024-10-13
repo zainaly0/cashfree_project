@@ -26,10 +26,13 @@ class PaymentController extends Controller
         ]);
 
         $cashfree = new Cashfree();
+        $cashfree->setClientId(env('CASHFREE_API_ID'));
+        $cashfree->setClientSecret(env('CASHFREE_API_SECRET'));
+        $cashfree->setEnvironment(Cashfree::SANDBOX);
 
-        
-        // Cashfree::$XClientId = env('CASHFREE_CLIENT_ID');
-        // Cashfree::$XClientSecret = env('CASHFREE_SECRET');
+
+        // Cashfree::$XClientId = env('CASHFREE_API_ID');
+        // Cashfree::$XClientSecret = env('CASHFREE_API_SECRET');
         // Cashfree::$XEnvironment = Cashfree::$SANDBOX;
         // Cashfree::$XEnvironment = Cashfree::$PRODUCTION;
 
@@ -40,7 +43,7 @@ class PaymentController extends Controller
         $return_url = "http://127.0.0.1:8000/success" . $order_id;
 
         $x_api_version = "2023-08-01";
-        $order_note = 'syed zain aly';
+        $order_note = 'Order note for reference';
         $customer_phone = $validate['number'];
         $customer_email = $validate['email'];
         $customer_name = $validate['name'];
@@ -75,7 +78,7 @@ class PaymentController extends Controller
       }
 
       public function PaymentSuccess($orderId){
-        $url = "https://sendbox.cashfree.com/pg/orders/$orderId";
+        $url = "https://sandbox.cashfree.com/pg/orders/$orderId";
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 20);
@@ -87,10 +90,23 @@ class PaymentController extends Controller
             'Accept: application/json',
             'x-api-version: 2023-08-01',
             'Content-type: application/json',
-            "x-client-id: ".env('CASHFREE_CLIENT_ID'),
-            "x-client-secret: ". env("CASHFREE_SECRET")
+            "x-client-id: ".env('CASHFREE_API_ID'),
+            "x-client-secret: ". env("CASHFREE_API_SECRET")
         ]);
 
+        $results = curl_exec($ch);
+        if(curl_errno($ch)){
+            $error_msg = curl_error($ch);
+            curl_close($ch);
+            return back()->withErrors("cURL Error: " . $error_msg);
+        }
 
+        $returnCode =curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        $response = json_decode($results, true);
+
+        // dd($response);
+        return view('payment-success', compact('response'));
       }
 }
